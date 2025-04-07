@@ -1,13 +1,47 @@
+/// A `Scanner` is a simple utility for parsing strings, allowing access to words,
+/// numbers, and lines from an input string.
+///
+/// The `Scanner` maintains a position in the input string and provides
+/// methods to extract the next number, word, or line from the remaining
+/// input.
 pub struct Scanner<'a> {
     input: &'a str,
     position: usize,
 }
 
 impl<'a> Scanner<'a> {
+    /// Creates a new `Scanner` for the given input string.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - A string slice that holds the input to be scanned.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let scanner = Scanner::new("Hello, world!");
+    /// ```
     pub fn new(input: &'a str) -> Self {
         Scanner { input, position: 0 }
     }
 
+    /// Scans for the next number in the input string.
+    ///
+    /// Parses a contiguous sequence of digits, including an optional leading
+    /// minus sign for negative numbers. Consumes the number from the input
+    /// and updates the scanner's position.
+    ///
+    /// # Returns
+    ///
+    /// * `Some(i32)` if a valid number is found.
+    /// * `None` if no valid number is found.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut scanner = Scanner::new("42 is the answer");
+    /// assert_eq!(scanner.next_number(), Some(42));
+    /// ```
     pub fn next_number(&mut self) -> Option<i32> {
         let remaining = self.get_remaining();
 
@@ -26,6 +60,22 @@ impl<'a> Scanner<'a> {
         }
     }
 
+    /// Scans for the next word in the input string.
+    ///
+    /// A word is defined as a contiguous sequence of non-whitespace characters.
+    /// Consumes the word from the input and updates the scanner's position.
+    ///
+    /// # Returns
+    ///
+    /// * `Some(&str)` if a valid word is found.
+    /// * `None` if no valid word is found.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut scanner = Scanner::new("Hello, world!");
+    /// assert_eq!(scanner.next_word(), Some("Hello,"));
+    /// ```
     pub fn next_word(&mut self) -> Option<&'a str> {
         let remaining = self.get_remaining();
 
@@ -53,6 +103,23 @@ impl<'a> Scanner<'a> {
         }
     }
 
+    /// Scans for the next line from the input string.
+    ///
+    /// A line is defined as a sequence of characters terminating with a newline
+    /// (`\n`). Consumes the line from the input and updates the scanner's
+    /// position.
+    ///
+    /// # Returns
+    ///
+    /// * `Some(&str)` if a valid line is found.
+    /// * `None` if no line is found (i.e., end of input).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut scanner = Scanner::new("First line\nSecond line");
+    /// assert_eq!(scanner.next_line(), Some("First line"));
+    /// ```
     pub fn next_line(&mut self) -> Option<&'a str> {
         let remaining = self.get_remaining();
 
@@ -70,6 +137,19 @@ impl<'a> Scanner<'a> {
         }
     }
 
+    /// Returns the remaining unscanned input as a string slice.
+    ///
+    /// # Returns
+    ///
+    /// A string slice of the remaining input.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut scanner = Scanner::new("Hello world!");
+    /// scanner.next_word();
+    /// assert_eq!(scanner.get_remaining(), "world!");
+    /// ```
     pub fn get_remaining(&self) -> &'a str {
         &self.input[self.position..]
     }

@@ -2,22 +2,40 @@
   description = "A Nix-flake-based Rust development environment";
 
   inputs = {
-    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1.*.tar.gz";
+    nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-  outputs = { self, nixpkgs, rust-overlay }:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      rust-overlay,
+    }:
     let
-      supportedSystems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
-      forEachSupportedSystem = f: nixpkgs.lib.genAttrs supportedSystems (system: f {
-        pkgs = import nixpkgs {
-          inherit system;
-          overlays = [ rust-overlay.overlays.default self.overlays.default ];
-        };
-      });
+      supportedSystems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "x86_64-darwin"
+        "aarch64-darwin"
+      ];
+      forEachSupportedSystem =
+        f:
+        nixpkgs.lib.genAttrs supportedSystems (
+          system:
+          f {
+            pkgs = import nixpkgs {
+              inherit system;
+              overlays = [
+                rust-overlay.overlays.default
+                self.overlays.default
+              ];
+            };
+          }
+        );
     in
     {
       overlays.default = final: prev: {
@@ -31,27 +49,45 @@
             rust.fromRustupToolchainFile ./rust-toolchain
           else
             rust.stable.latest.default.override {
-              extensions = [ "rust-src" "rustfmt" ];
+              extensions = [
+                "rust-src"
+                "rustfmt"
+              ];
             };
       };
 
-      devShells = forEachSupportedSystem ({ pkgs }: {
-        default = pkgs.mkShell {
-          packages = with pkgs; [
-            rustToolchain
-            openssl
-            pkg-config
-            cargo-deny
-            cargo-edit
-            cargo-watch
-            rust-analyzer
-          ];
+      devShells = forEachSupportedSystem (
+        { pkgs }:
+        let
+          inherit (pkgs) mkShell;
+          inherit (pkgs.lib) getExe;
+          inherit (pkgs) rustToolchain;
+          inherit (pkgs.rust.packages.stable.rustPlatform) rustLibSrc;
+          onefetch = getExe pkgs.onefetch;
+        in
+        {
+          default = mkShell {
+            packages = [
+              rustToolchain
 
-          env = {
-            # Required by rust-analyzer
-            RUST_SRC_PATH = "${pkgs.rustToolchain}/lib/rustlib/src/rust/library";
+              pkgs.openssl
+              pkgs.pkg-config
+              pkgs.cargo-deny
+              pkgs.cargo-edit
+              pkgs.cargo-watch
+              pkgs.rust-analyzer
+            ];
+
+            env = {
+              # Required by rust-analyzer
+              RUST_SRC_PATH = "${rustLibSrc}";
+            };
+
+            shellHook = ''
+              ${onefetch} --no-bots 2>/dev/null
+            '';
           };
-        };
-      });
+        }
+      );
     };
 }

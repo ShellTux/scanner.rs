@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 /// A `Scanner` is a simple utility for parsing strings, allowing access to words,
 /// numbers, and lines from an input string.
 ///
@@ -19,10 +21,68 @@ impl<'a> Scanner<'a> {
     /// # Examples
     ///
     /// ```
+    /// use scanner::scanner::Scanner;
     /// let scanner = Scanner::new("Hello, world!");
     /// ```
     pub fn new(input: &'a str) -> Self {
         Scanner { input, position: 0 }
+    }
+
+    /// Scans for the next token in the input string based on a provided predicate.
+    ///
+    /// A token is defined as a contiguous sequence of characters that satisfy the
+    /// condition defined by the `predicate` closure. This method will consume the
+    /// characters matching the predicate from the input string and update the scanner's position.
+    ///
+    /// # Arguments
+    ///
+    /// * `predicate`: A closure that takes a character as input and returns a boolean,
+    /// determining whether the character should be considered part of the token.
+    ///
+    /// # Returns
+    ///
+    /// * `Option<&'a str>` if a valid token is found.
+    /// * `None` if no valid token can be found.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use scanner::scanner::Scanner;
+    /// let mut scanner = Scanner::new("Hello, world!");
+    /// // Scan for words (non-whitespace characters)
+    /// assert_eq!(scanner.next_token(|c, _| !c.is_whitespace()), Some("Hello,"));
+    ///
+    /// let mut scanner = Scanner::new("123 456 789");
+    /// // Scan for numbers (digits)
+    /// assert_eq!(scanner.next_token(|c, _| c.is_digit(10)), Some("123"));
+    /// ```
+    pub fn next_token<F>(&mut self, predicate: F) -> Option<&'a str>
+    where
+        F: Fn(char, usize) -> bool,
+    {
+        let remaining = self.get_remaining();
+
+        let mut token_len: usize = 0;
+        let mut valid_chars_count: usize = 0;
+
+        for (i, c) in remaining.char_indices() {
+            if predicate(c, i) {
+                valid_chars_count += 1;
+                token_len = i + 1;
+            } else {
+                if valid_chars_count > 0 {
+                    break;
+                }
+                token_len = i; // update token length to exclude this character
+            }
+        }
+
+        if valid_chars_count > 0 {
+            self.position += token_len;
+            Some(remaining[..token_len].trim_start())
+        } else {
+            None
+        }
     }
 
     /// Scans for the next number in the input string.
@@ -33,31 +93,29 @@ impl<'a> Scanner<'a> {
     ///
     /// # Returns
     ///
-    /// * `Some(i32)` if a valid number is found.
+    /// * `Some(T)` if a valid number is found.
     /// * `None` if no valid number is found.
     ///
     /// # Examples
     ///
     /// ```
+    /// use scanner::scanner::Scanner;
     /// let mut scanner = Scanner::new("42 is the answer");
     /// assert_eq!(scanner.next_number(), Some(42));
     /// ```
-    pub fn next_number(&mut self) -> Option<i32> {
-        let remaining = self.get_remaining();
-
-        let (number_len, valid_chars_count): (usize, usize) = remaining
-            .trim_start()
-            .char_indices()
-            .take_while(|&(_, c)| c.is_digit(10) || c == '-')
-            .fold((0, 0), |(_, count), (i, _)| (i + 1, count + 1));
-        let number_len = number_len + remaining.len() - remaining.trim_start().len();
-
-        if valid_chars_count > 0 {
-            self.position += number_len;
-            Some(remaining[..number_len].trim_start().parse::<i32>().ok()?)
-        } else {
-            None
-        }
+    pub fn next_number<T>(&mut self) -> Option<T>
+    where
+        T: FromStr,
+    {
+        let position = self.position;
+        self.next_token(|c, i| c.is_digit(10) || (c == '-' && i == 0))
+            .and_then(|token| match token.parse::<T>() {
+                Ok(number) => Some(number),
+                Err(_) => {
+                    self.position = position;
+                    None
+                }
+            })
     }
 
     /// Scans for the next word in the input string.
@@ -73,34 +131,12 @@ impl<'a> Scanner<'a> {
     /// # Examples
     ///
     /// ```
+    /// use scanner::scanner::Scanner;
     /// let mut scanner = Scanner::new("Hello, world!");
     /// assert_eq!(scanner.next_word(), Some("Hello,"));
     /// ```
     pub fn next_word(&mut self) -> Option<&'a str> {
-        let remaining = self.get_remaining();
-
-        let mut word_len: usize = 0;
-        let mut valid_chars_count: usize = 0;
-
-        for (i, c) in remaining.char_indices() {
-            if !c.is_whitespace() {
-                valid_chars_count += 1;
-                word_len = i + 1;
-            } else {
-                word_len = i;
-
-                if valid_chars_count > 0 {
-                    break;
-                }
-            }
-        }
-
-        if valid_chars_count > 0 {
-            self.position += word_len;
-            Some(remaining[..word_len].trim_start())
-        } else {
-            None
-        }
+        self.next_token(|c, _| !c.is_whitespace())
     }
 
     /// Scans for the next line from the input string.
@@ -117,6 +153,7 @@ impl<'a> Scanner<'a> {
     /// # Examples
     ///
     /// ```
+    /// use scanner::scanner::Scanner;
     /// let mut scanner = Scanner::new("First line\nSecond line");
     /// assert_eq!(scanner.next_line(), Some("First line"));
     /// ```
@@ -146,9 +183,10 @@ impl<'a> Scanner<'a> {
     /// # Examples
     ///
     /// ```
+    /// use scanner::scanner::Scanner;
     /// let mut scanner = Scanner::new("Hello world!");
     /// scanner.next_word();
-    /// assert_eq!(scanner.get_remaining(), "world!");
+    /// assert_eq!(scanner.get_remaining(), " world!");
     /// ```
     pub fn get_remaining(&self) -> &'a str {
         &self.input[self.position..]
@@ -162,7 +200,7 @@ mod tests {
     #[test]
     fn test_empty() {
         let mut scanner = Scanner::new("");
-        assert_eq!(scanner.next_number(), None);
+        assert_eq!(scanner.next_number::<i32>(), None);
     }
 
     #[test]
@@ -199,13 +237,13 @@ mod tests {
         assert_eq!(scanner.next_number(), Some(-30));
         assert_eq!(scanner.next_number(), Some(33));
         assert_eq!(scanner.next_number(), Some(85));
-        assert_eq!(scanner.next_number(), None);
+        assert_eq!(scanner.next_number::<i32>(), None);
     }
 
     #[test]
     fn test_next_number_no_digits() {
         let mut scanner = Scanner::new("no numbers here");
-        assert_eq!(scanner.next_number(), None);
+        assert_eq!(scanner.next_number::<i32>(), None);
         assert_eq!(scanner.get_remaining(), "no numbers here");
     }
 
@@ -215,16 +253,16 @@ mod tests {
         assert_eq!(scanner.next_number(), Some(55));
         assert_eq!(scanner.get_remaining(), "   88");
         assert_eq!(scanner.next_number(), Some(88));
-        assert_eq!(scanner.next_number(), None);
+        assert_eq!(scanner.next_number::<i32>(), None);
     }
 
     #[test]
     fn test_get_remaining() {
         let mut scanner = Scanner::new("123 456");
         assert_eq!(scanner.get_remaining(), "123 456");
-        scanner.next_number();
+        scanner.next_number::<i32>();
         assert_eq!(scanner.get_remaining(), " 456");
-        scanner.next_number();
+        scanner.next_number::<i32>();
         assert_eq!(scanner.get_remaining(), "");
     }
 
@@ -232,13 +270,13 @@ mod tests {
     fn test_next_number_non_digit_characters() {
         let mut scanner = Scanner::new("abc 123 xyz 456");
 
-        assert_eq!(scanner.next_number(), None);
+        assert_eq!(scanner.next_number::<i32>(), None);
         assert_eq!(scanner.get_remaining(), "abc 123 xyz 456");
         assert_eq!(scanner.next_word(), Some("abc"));
         assert_eq!(scanner.get_remaining(), " 123 xyz 456");
         assert_eq!(scanner.next_word(), Some("123"));
         assert_eq!(scanner.get_remaining(), " xyz 456");
-        assert_eq!(scanner.next_number(), None);
+        assert_eq!(scanner.next_number::<i32>(), None);
         assert_eq!(scanner.get_remaining(), " xyz 456");
         assert_eq!(scanner.next_word(), Some("xyz"));
         assert_eq!(scanner.get_remaining(), " 456");
@@ -246,25 +284,25 @@ mod tests {
         assert_eq!(scanner.get_remaining(), "");
     }
 
-    //#[test]
-    //fn test_negative_sign_between_numbers() {
-    //    let mut scanner = Scanner::new("5-3");
-    //
-    //    assert_eq!(scanner.next_number(), Some(5));
-    //    assert_eq!(scanner.get_remaining(), "-3");
-    //    assert_eq!(scanner.next_number(), Some(-3));
-    //
-    //    let mut scanner = Scanner::new("5 - 3");
-    //
-    //    assert_eq!(scanner.next_number(), Some(5));
-    //    assert_eq!(scanner.get_remaining(), " - 3");
-    //    assert_eq!(scanner.next_number(), None);
-    //    assert_eq!(scanner.get_remaining(), " - 3");
-    //    assert_eq!(scanner.next_word(), Some("-"));
-    //    assert_eq!(scanner.get_remaining(), " 3");
-    //    assert_eq!(scanner.next_number(), Some(3));
-    //    assert_eq!(scanner.get_remaining(), "");
-    //}
+    #[test]
+    fn test_negative_sign_between_numbers() {
+        let mut scanner = Scanner::new("5-3");
+
+        assert_eq!(scanner.next_number(), Some(5));
+        assert_eq!(scanner.get_remaining(), "-3");
+        assert_eq!(scanner.next_number(), Some(-3));
+
+        let mut scanner = Scanner::new("5 - 3");
+
+        assert_eq!(scanner.next_number(), Some(5));
+        assert_eq!(scanner.get_remaining(), " - 3");
+        assert_eq!(scanner.next_number::<i32>(), None);
+        assert_eq!(scanner.get_remaining(), " - 3");
+        assert_eq!(scanner.next_word(), Some("-"));
+        assert_eq!(scanner.get_remaining(), " 3");
+        assert_eq!(scanner.next_number(), Some(3));
+        assert_eq!(scanner.get_remaining(), "");
+    }
 
     #[test]
     fn test_next_line() {

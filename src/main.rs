@@ -2,13 +2,13 @@ use scanner::scanner::Scanner;
 
 // Example
 fn main() {
-    let input = "8 + 9";
+    let input = "-8 + 9";
 
     let mut scanner = Scanner::new(&input);
 
-    let x = scanner.next_number().expect("Expecting number");
+    let x: isize = scanner.next_number().expect("Expecting number");
     let op = scanner.next_word().expect("Expecting word");
-    let y = scanner.next_number().expect("Expecting number");
+    let y: isize = scanner.next_number().expect("Expecting number");
 
     let result = match op {
         "+" => x + y,

@@ -4,7 +4,7 @@ use scanner::scanner::Scanner;
 fn main() {
     let input = "-8 + 9";
 
-    let mut scanner = Scanner::new(&input);
+    let mut scanner = Scanner::new(input);
 
     let x: isize = scanner.next_number().expect("Expecting number");
     let op = scanner.next_word().expect("Expecting word");
